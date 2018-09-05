@@ -1,0 +1,28 @@
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.3.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.3.4/dist/leaflet.js"></script>
+</head>
+<body>
+    <div id="map" style="width: 100%; height: 100%"></div>
+    <div id="map-control" style="position: absolute; right: 10px; top: 10px; width: 300px; padding: 10px; background-color: white">
+        Folder: <input id="tile-input" value="Hordaland" style="width: 100px" />
+        <input type="button" value="Apply" onclick="changeTileLayer()" />
+    </div>
+    <script>
+
+        const map = L.map('map', { center: [51.505, 10.00], zoom: 1 });
+
+        function changeTileLayer() {
+            const folder = document.getElementById("tile-input").value;
+            map.eachLayer(function (layer) {
+                map.removeLayer(layer);
+            });
+            L.tileLayer(folder + '/{z}/tile_{x}_{y}.png').addTo(map);
+        }
+
+        changeTileLayer();
+    </script>
+</body>
+</html>
