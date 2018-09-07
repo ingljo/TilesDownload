@@ -3,7 +3,7 @@ This tool download tiles from map server for all zoom levels specified.
 Specify a geojson file with one or more polygons to limit area for download if needed.
 
 ## Usage
-Clone repo or download [Dist package](/Dist/TilesDownload.zip).
+Clone repo or download [Dist package](/Dist/TilesDownload.zip?raw=true).
 
 Run command line application with following parameters:
 
