@@ -29,7 +29,7 @@ regObs.TilesDownloadConsoleApp.exe --max 15 --name "Lofoten og Vesterålen" --pa
 View downloaded tiles by opening the test.html in the directory of the downloaded files. Set folder to use in the top right folder control.
 
 
-## Polygons in Norwegion avalanche regions
+## Polygons in Norwegian avalanche regions
 Regions in varslingsomraader.json is taken from https://github.com/ragnarekker/varsomdata/tree/master/varsomdata/input/forecastregionshapes and converted to Lat Lng coordinates using: https://ogre.adc4gis.com/
 Target SRS: +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs
 (Create a zip package containing the .shp, dbf, .prj, etc files.)
