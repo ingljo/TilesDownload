@@ -28,7 +28,8 @@ namespace regObs.TilesDownloadConsoleApp
                     featurePropertyValue: o.FeaturePropertyValue,
                     geoJsonFilename: o.GeoJsonPath,
                     writeReport: o.WriteReport,
-                    parallellTasks: o.ParralellTasks));
+                    parallellTasks: o.ParralellTasks,
+                    skipExisting: o.SkipExisting));
 
                 try
                 {

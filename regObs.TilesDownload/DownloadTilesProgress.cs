@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
@@ -9,11 +8,21 @@ namespace regObs.TilesDownload
     {
 
         private Dictionary<string, bool> _tilesDownloaded;
+        private List<string> _errorTiles;
+
+        public bool HasError
+        {
+            get
+            {
+                return _errorTiles.Count() > 0;
+            }
+        }
 
 
         public DownloadTilesProgress(List<string> tilesToDownload) : base()
         {
             _tilesDownloaded = tilesToDownload.ToDictionary(key => key, value => false);
+            _errorTiles = new List<string>();
         }
 
         public void SetTilesDownloaded(List<string> tilesDownloaded)
@@ -32,6 +41,12 @@ namespace regObs.TilesDownload
                     ElapsedMilliseconds = this.ElapsedMilliseconds,
                 };
             }
+        }
+
+        internal void SetError(List<string> errorTiles)
+        {
+            _errorTiles.AddRange(errorTiles);
+            _errorTiles = _errorTiles.Distinct().ToList();
         }
     }
 }

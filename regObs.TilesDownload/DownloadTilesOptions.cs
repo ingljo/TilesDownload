@@ -24,6 +24,8 @@ namespace regObs.TilesDownload
 
         public bool WriteReport { get; set; }
 
+        public bool SkipExisting { get; set; }
+
         public DownloadTilesOptions(
             string folder = "", 
             IProgress<DownloadTilesProgressReport> progressReporter = null, 
@@ -34,7 +36,8 @@ namespace regObs.TilesDownload
             string featureProperty = "OMRAADENAV", 
             string featurePropertyValue = "", 
             string geoJsonFilename = "varslingsomraader.json",
-            bool writeReport = true)
+            bool writeReport = true,
+            bool skipExisting = false)
         {
             MinZoom = minZoom;
             MaxZoom = maxZoom;
@@ -46,6 +49,7 @@ namespace regObs.TilesDownload
             Folder = folder;
             ProgressReporter = progressReporter;
             WriteReport = writeReport;
+            SkipExisting = skipExisting;
         }
     }
 }

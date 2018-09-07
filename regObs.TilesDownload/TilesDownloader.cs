@@ -7,9 +7,6 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Linq;
 using NLog;
-using System.Data.Entity.Spatial;
-using System.Globalization;
-using Microsoft.SqlServer.Types;
 
 namespace regObs.TilesDownload
 {
@@ -17,6 +14,7 @@ namespace regObs.TilesDownload
     {
         private string tilesUrlTemplate;
         private DownloadTilesOptions options;
+        private Dictionary<string, Tile> errorTiles;
 
         /**
          * <param name="tilesUrlTemplate">Tiles template url</param>
@@ -27,6 +25,7 @@ namespace regObs.TilesDownload
         {
             this.tilesUrlTemplate = tilesUrlTemplate;
             this.options = options != null ? options : new DownloadTilesOptions();
+            this.errorTiles = new Dictionary<string, Tile>();
         }
 
         /**
@@ -44,14 +43,16 @@ namespace regObs.TilesDownload
             {
                 foreach (var batch in polygon.Value.Chunkify(this.options.ParallellTasks))
                 {
-                    var tasks = batch.Select(x => x.Download(downloadFolder: this.options.Folder, name: polygon.Key, imageFormat: this.options.ImageFormat, httpClient: client));
-                    await Task.WhenAll(tasks);
-                    progress.SetTilesDownloaded(batch.Select(x => $"{polygon.Key}_{x.Url}").ToList());
-                    if (this.options.ProgressReporter != null)
-                    {
-                        this.options.ProgressReporter.Report(progress.Report);
-                    }
+                    SetTileGroup(polygon.Key, batch);
+                    await DownloadBatch(batch, progress, client);
                 }
+            }
+
+            int retryCount = 5;
+            while(errorTiles.Count() > 0 && retryCount > 0)
+            {
+                retryCount--;
+                await DownloadBatch(errorTiles.Select(x=>x.Value), progress, client);
             }
             
 
@@ -59,6 +60,37 @@ namespace regObs.TilesDownload
             {
                 var report = $"<html><body><table><tr><td>Last run</td><td>{DateTime.Now}</td></tr><tr><td>Tiles downloaded</td><td>{progress.Report.Complete}</td></tr><tr><td>Downloaded to path</td><td>{this.options.Folder}</td></tr><tr><td>Time used</td><td>{progress.Elapsed}</td></tr></table></body></html>";
                 File.WriteAllText("report.html", report);
+            }
+        }
+
+        private void SetTileGroup(string name, IEnumerable<Tile> batch)
+        {
+            foreach (var tile in batch)
+            {
+                tile.GroupName = name;
+            }
+        }
+
+        private async Task DownloadBatch(IEnumerable<Tile> batch, DownloadTilesProgress progress, HttpClient httpClient)
+        {
+            var tasks = batch.Select(x => x.Download(downloadFolder: this.options.Folder, imageFormat: this.options.ImageFormat, httpClient: httpClient, skipIfExist: this.options.SkipExisting));
+            var result = await Task.WhenAll(tasks);
+            progress.SetTilesDownloaded(result.Where(x => x.Item2).Select(x => $"{x.Item1.GroupName}_{x.Item1.Url}").ToList());
+            foreach(var tileResult in result)
+            {
+                var id = $"{tileResult.Item1.GroupName}_{tileResult.Item1.Url}";
+                if (tileResult.Item2)
+                {
+                    errorTiles.Remove(id);
+                }
+                else
+                {
+                    errorTiles[id] = tileResult.Item1;
+                }
+            }
+            if (this.options.ProgressReporter != null)
+            {
+                this.options.ProgressReporter.Report(progress.Report);
             }
         }
 

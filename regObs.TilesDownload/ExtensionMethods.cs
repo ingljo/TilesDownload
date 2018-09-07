@@ -19,21 +19,37 @@ namespace regObs.TilesDownload
         public const double MinLongitude = -180;
         public const double MaxLongitude = 180;
 
-        public static async Task Download(this Tile tile, string downloadFolder, string name, ImageFormat imageFormat = ImageFormat.png, HttpClient httpClient = null)
+        public static async Task<Tuple<Tile, bool>> Download(this Tile tile, string downloadFolder, ImageFormat imageFormat = ImageFormat.png, HttpClient httpClient = null, bool skipIfExist = false)
         {
             LogManager.GetCurrentClassLogger().Trace(() => $"Downloading tile {tile.Url}");
-            var client = httpClient != null ? httpClient : new HttpClient();
-            var result = await client.GetAsync(tile.Url);
-            if (result.IsSuccessStatusCode)
+            var directory = $"{downloadFolder}\\{tile.GroupName}\\{tile.Z}";
+            var filePath = $"{directory}\\tile_{tile.X}_{tile.Y}.{imageFormat}";
+            if(skipIfExist && File.Exists(filePath))
             {
-                var stream = await result.Content.ReadAsStreamAsync();
-                var directory = $"{downloadFolder}\\{name}\\{tile.Z}";
-                CreateFolderIfNotExists(directory);
-                var filePath = $"{directory}\\tile_{tile.X}_{tile.Y}.{imageFormat}";
-                using (var fs = File.OpenWrite(filePath))
+                return new Tuple<Tile, bool>(tile, true);
+            }
+            CreateFolderIfNotExists(directory);
+            var client = httpClient != null ? httpClient : new HttpClient();
+
+            try
+            {
+                var result = await client.GetAsync(tile.Url);
+                if (result.IsSuccessStatusCode)
                 {
-                    await stream.CopyToAsync(fs);
+                    var stream = await result.Content.ReadAsStreamAsync();
+
+                    using (var fs = File.OpenWrite(filePath))
+                    {
+                        await stream.CopyToAsync(fs);
+                    }
                 }
+
+                return new Tuple<Tile, bool>(tile, true);
+            }
+            catch(Exception ex)
+            {
+                LogManager.GetCurrentClassLogger().Error(ex, "Could not dowload tile");
+                return new Tuple<Tile, bool>(tile, false);
             }
         }
 

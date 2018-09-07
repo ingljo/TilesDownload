@@ -11,6 +11,8 @@ namespace regObs.TilesDownload
 
         public int Z { get; private set; }
 
+        public string GroupName { get; set; }
+
         private string urlTemplate;
 
         public string Url

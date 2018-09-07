@@ -39,5 +39,8 @@ namespace regObs.TilesDownloadConsoleApp
 
         [Option("parallell", Required = false, HelpText = "Number of tiles to download in parallell.", Default = 4)]
         public int ParralellTasks { get; set; }
+
+        [Option("skipexisting", Required = false, HelpText = "Skip existing tiles (Continue download from last tile in folder).", Default = false)]
+        public bool SkipExisting { get; set; }
     }
 }

@@ -3,6 +3,8 @@ This tool download tiles from map server for all zoom levels specified.
 Specify a geojson file with one or more polygons to limit area for download if needed.
 
 ## Usage
+Clone repo or download [Dist package](/blob/master/Dist/TilesDownload.zip).
+
 Run command line application with following parameters:
 
 | Parameter     | Description       | Default            | Example            |
@@ -10,17 +12,18 @@ Run command line application with following parameters:
 | -h, --help    | Display help text |                    |                    |
 | --tiles       | Tiles url         | http://opencache.statkart.no/gatekeeper/gk/gk.open_gmaps?layers=norgeskart_bakgrunn&zoom={z}&x={x}&y={y} | |
 | --min         | Lowest zoom level | 1                  |                    |
-| --max         | Highest zoom level. Max zoom level for tiles is often between 17 and 22 | 10   |   |
+| --max         | Highest zoom level. Max zoom level for tiles is often between 17 and 22. Be aware! Level 16 and above gives a lot of tiles to download! | 10   |   |
 | --path        | Path to save tiles | Current folder    | "C:\tmp"           |
-| --geojson     | Full path to geojson file with polygon areas to download |  varslingsomraader.json | |
-| --property        | Feature property from geosjon to use as name | OMRAADENAV | |
-| --name       | Feature property value in named property | | Hallingdal |
-| --imageformat | Image format to save tiles. Use the same as tiles. | png | |
+| --geojson     | Full path to geojson file with polygon areas to download. If no file specified, download the whole world. |  varslingsomraader.json | |
+| --property    | Feature property from geosjon to use as name | OMRAADENAV | |
+| --name       | Feature property value in named property. If empty, download all areas. | | Hallingdal |
+| --imageformat | Image format to save tiles. Use the same as result from tiles url. | png | |
 | --writereport | Write HTML report at end | true | |
 | --parallell   | Number of tiles to download in parallell. Increase to download faster, but tiles server might be overloaded! | 4 |  |
+| --skipexisting | Skip download tile if file already exists in folder | false | |
 
 ### Example
-regObs.TilesDownloadConsoleApp.exe --max 16 --name "Lofoten og Vesterålen" --path "C:\tmp"
+regObs.TilesDownloadConsoleApp.exe --max 15 --name "Lofoten og Vesterålen" --path "C:\tmp"
 
 ## View downloaded tiles
 View downloaded tiles by opening the test.html in the directory of the downloaded files. Set folder to use in the top right folder control.
@@ -34,7 +37,7 @@ Target SRS: +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs
 
 ## Example sizes
 
-| Area       | Zoom levels | Tiles        | Size       |
-|------------|-------------|--------------|------------|
-| Hallingdal | 1 - 16      |  129 330     | 3,51 GB    |
-| Lofoten og Vesterålen | 1-16 | | |
+| Area                  | Zoom levels | Tiles        | Size       |
+|-----------------------|-------------|--------------|------------|
+| Hallingdal            | 1-16        |  129 330     | 3,51 GB    |
+| Lofoten og Vesterålen | 1-16        |              |            |
