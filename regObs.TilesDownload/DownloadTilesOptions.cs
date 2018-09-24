@@ -12,9 +12,9 @@ namespace regObs.TilesDownload
             "http://gis3.nve.no/arcgis/rest/services/wmts/Bratthet/MapServer/tile/{z}/{y}/{x}",
             "http://gis3.nve.no/arcgis/rest/services/wmts/SvekketIs/MapServer/tile/{z}/{y}/{x}",
         })]
-        public IEnumerable<string> TilesUrlTemplate { get; set; }
+        public IEnumerable<string> TileSourceUrls { get; set; }
 
-        [Option("tilenames", Required = false, HelpText = "Tile names. (Comma separated)", Separator=',', Default = new string[] { "topo", "clayzones", "floodzoones", "steepness", "weakenedice" })]
+        [Option("tilenames", Required = false, HelpText = "Tile source names. (Comma separated)", Separator=',', Default = new string[] { "topo", "clayzones", "floodzoones", "steepness", "weakenedice" })]
         public IEnumerable<string> TilesNames { get; set; }
 
         [Option("min", Required = false, HelpText = "Minimum zoom level to download.", Default = 1)]
@@ -35,7 +35,7 @@ namespace regObs.TilesDownload
         [Option("value", Required = false, HelpText = "Feature property value. (For shape files with multiple features. For example Hallingdal.)")]
         public string FeaturePropertyValue { get; set; }
 
-        [Option("imageformat", Required = false, HelpText = "Image format (jpg or png)", Default = ImageFormat.jpg)]
+        [Option("imageformat", Required = false, HelpText = "Image format (jpg or png)", Default = ImageFormat.png)]
         public ImageFormat ImageFormat { get; set; }
 
         [Option("writereport", Required = false,  HelpText = "Write report when complete.", Default = true)]
@@ -55,5 +55,8 @@ namespace regObs.TilesDownload
 
         [Option("zip", Required = false, HelpText = "Zip folder when complete", Default = false)]
         public bool ZipOnComplete { get; set; }
+
+        [Option("retry", Required = false, HelpText = "How many times to retry download of failed tiles", Default = 5)]
+        public int RetryCount { get; set; }
     }
 }

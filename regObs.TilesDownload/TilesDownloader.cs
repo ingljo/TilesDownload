@@ -30,38 +30,69 @@ namespace regObs.TilesDownload
          */
         public async Task Start()
         {
-            LogManager.GetCurrentClassLogger().Info($"Starting download tiles from {this.options.TilesUrlTemplate}, options: {Newtonsoft.Json.JsonConvert.SerializeObject(this.options)}");
-            var tilesToDownload = GetTilesToDownloadFromPolygon();
-            var allTiles = new List<Tile>();
-            for(int i=0; i<this.options.TilesUrlTemplate.Count();i++)
-            {
-                var name = this.options.TilesNames.Count() > i ? this.options.TilesNames.ToList()[i] : $"tile_{i}";
-                var urlTemplate = this.options.TilesUrlTemplate.ToList()[i];
-                var tileUrlForCurrentTile = tilesToDownload.SelectMany(x => x.Value.Select(y => new Tile(x:(int)y.X, y:(int)y.Y, z:(int)y.Z, groupName: x.Key, tileName: name, urlTemplate: urlTemplate))).ToList();
-                allTiles.AddRange(tileUrlForCurrentTile);
-            }
+            LogManager.GetCurrentClassLogger().Info($"Starting download tiles from {this.options.TileSourceUrls}, options: {Newtonsoft.Json.JsonConvert.SerializeObject(this.options)}");
+            var tilesInPolygon = GetTilesToDownloadFromPolygon();
+            var tilesToDownload = GetTilesToDownloadForAllSources(tilesInPolygon);
             var client = new HttpClient();
-            var progress = new DownloadTilesProgress(allTiles);
+            var progress = new DownloadTilesProgress(tilesToDownload);
             progress.Start();
 
 
-            foreach (var batch in allTiles.Chunkify(this.options.ParallellTasks))
+            foreach (var batch in tilesToDownload.Chunkify(this.options.ParallellTasks))
             {
                 await DownloadBatch(batch, progress, client);
             }
 
-            int retryCount = 5;
-            while(errorTiles.Count() > 0 && retryCount > 0)
+            await RetryDownloadOfFailedTiles(client, progress);
+
+            if (errorTiles.Count > 0)
             {
-                retryCount--;
-                await DownloadBatch(errorTiles, progress, client);
+                LogManager.GetCurrentClassLogger().Error($"Tiles left to download: ${string.Join(", ", errorTiles)}");
+                throw new ApplicationException("Could not download all tiles!");
             }
-            
+
+            if (this.options.WriteMetadata)
+            {
+                var folders = tilesToDownload.GroupBy(x => new { x.TileName, x.GroupName }).Select((g) => new { key = $"{g.Key.TileName}//{g.Key.GroupName}", metadata = Newtonsoft.Json.JsonConvert.SerializeObject(g.Select(t => $"{t.TileName}/{t.Z}/tile_{t.X}_{t.Y}")) });
+                foreach (var folder in folders)
+                {
+                    var path = this.options.Path + "//" + folder.key;
+                    File.WriteAllText(path, folder.metadata);
+                }
+            }
+
 
             if (this.options.WriteReport)
             {
                 var report = $"<html><body><table><tr><td>Last run</td><td>{DateTime.Now}</td></tr><tr><td>Tiles downloaded</td><td>{progress.Report.Complete}</td></tr><tr><td>Downloaded to path</td><td>{this.options.Path}</td></tr><tr><td>Time used</td><td>{progress.Elapsed}</td></tr></table></body></html>";
                 File.WriteAllText("report.html", report);
+            }
+        }
+
+        private List<Tile> GetTilesToDownloadForAllSources(Dictionary<string, List<Point>> tilesInPolygon)
+        {
+            var allTiles = new List<Tile>();
+            for (int i = 0; i < this.options.TileSourceUrls.Count(); i++)
+            {
+                var name = this.options.TilesNames.Count() > i ? this.options.TilesNames.ToList()[i] : $"tile_{i}";
+                var urlTemplate = this.options.TileSourceUrls.ToList()[i];
+                var tileUrlForCurrentTile = tilesInPolygon.SelectMany(x => x.Value.Select(y => new Tile(x: (int)y.X, y: (int)y.Y, z: (int)y.Z, groupName: x.Key, tileName: name, urlTemplate: urlTemplate))).ToList();
+                allTiles.AddRange(tileUrlForCurrentTile);
+            }
+
+            return allTiles;
+        }
+
+        private async Task RetryDownloadOfFailedTiles(HttpClient client, DownloadTilesProgress progress)
+        {
+            int retryCount = this.options.RetryCount;
+            while (errorTiles.Count() > 0 && retryCount > 0)
+            {
+                retryCount--;
+                foreach (var batch in errorTiles.Chunkify(this.options.ParallellTasks))
+                {
+                    await DownloadBatch(batch, progress, client);
+                }
             }
         }
 
@@ -78,7 +109,10 @@ namespace regObs.TilesDownload
                 }
                 else
                 {
-                    errorTiles.Add(tileResult.Item1);
+                    if (!errorTiles.Contains(tileResult.Item1))
+                    {
+                        errorTiles.Add(tileResult.Item1);
+                    }
                 }
             }
             if (this.progressReporter != null)

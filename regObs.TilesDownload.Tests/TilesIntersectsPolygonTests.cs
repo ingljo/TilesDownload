@@ -8,7 +8,7 @@ using System.Linq;
 namespace regObs.TilesDownload.Tests
 {
     [TestClass]
-    public class UnitTest1
+    public class TilesIntersectsPolygonTests
     {
 
         private Polygon GetPolygonOfAkerBryggeBislettAndGronland()

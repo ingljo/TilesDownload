@@ -35,6 +35,11 @@ namespace regObs.TilesDownload
             this.urlTemplate = urlTemplate;
         }
 
+        public override string ToString()
+        {
+            return $"x:{X}, y:{Y}, z:{Z}, group: {GroupName}, name: {TileName}";
+        }
+
         public bool Equals(Tile other)
         {
             return this.X == other.X && this.Y == other.Y && this.Z == other.Z && this.TileName == other.TileName && this.GroupName == other.GroupName;
