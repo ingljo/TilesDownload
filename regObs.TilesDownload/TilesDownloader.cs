@@ -1,31 +1,28 @@
-﻿using GeoJSON.Net.Feature;
-using NetTopologySuite.IO;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Linq;
 using NLog;
+using DotSpatial.Data;
+using DotSpatial.Projections;
+using DotSpatial.Topology;
 
 namespace regObs.TilesDownload
 {
     public class TilesDownloader
     {
-        private string tilesUrlTemplate;
         private DownloadTilesOptions options;
-        private Dictionary<string, Tile> errorTiles;
+        private List<Tile> errorTiles;
+        private IProgress<DownloadTilesProgressReport> progressReporter;
 
-        /**
-         * <param name="tilesUrlTemplate">Tiles template url</param>
-         * <example>http://opencache.statkart.no/gatekeeper/gk/gk.open_gmaps?layers=norgeskart_bakgrunn&zoom={z}&x={x}&y={y}</example>
-         * <param name="options">options to use</param>
-         */
-        public TilesDownloader(string tilesUrlTemplate, DownloadTilesOptions options = null)
+
+        public TilesDownloader(DownloadTilesOptions options, IProgress<DownloadTilesProgressReport> progressReporter = null)
         {
-            this.tilesUrlTemplate = tilesUrlTemplate;
-            this.options = options != null ? options : new DownloadTilesOptions();
-            this.errorTiles = new Dictionary<string, Tile>();
+            this.options =  options;
+            this.errorTiles = new List<Tile>();
+            this.progressReporter = progressReporter;
         }
 
         /**
@@ -33,93 +30,90 @@ namespace regObs.TilesDownload
          */
         public async Task Start()
         {
-            LogManager.GetCurrentClassLogger().Info($"Starting download tiles from {this.tilesUrlTemplate}, options: {Newtonsoft.Json.JsonConvert.SerializeObject(this.options)}");
-            var tilesToDownload = GetTilesToDownload();
+            LogManager.GetCurrentClassLogger().Info($"Starting download tiles from {this.options.TilesUrlTemplate}, options: {Newtonsoft.Json.JsonConvert.SerializeObject(this.options)}");
+            var tilesToDownload = GetTilesToDownloadFromPolygon();
+            var allTiles = new List<Tile>();
+            for(int i=0; i<this.options.TilesUrlTemplate.Count();i++)
+            {
+                var name = this.options.TilesNames.Count() > i ? this.options.TilesNames.ToList()[i] : $"tile_{i}";
+                var urlTemplate = this.options.TilesUrlTemplate.ToList()[i];
+                var tileUrlForCurrentTile = tilesToDownload.SelectMany(x => x.Value.Select(y => new Tile(x:(int)y.X, y:(int)y.Y, z:(int)y.Z, groupName: x.Key, tileName: name, urlTemplate: urlTemplate))).ToList();
+                allTiles.AddRange(tileUrlForCurrentTile);
+            }
             var client = new HttpClient();
-            var progress = new DownloadTilesProgress(tilesToDownload.SelectMany(x=> x.Value.Select(y=>$"{x.Key}_{y.Url}")).ToList());
+            var progress = new DownloadTilesProgress(allTiles);
             progress.Start();
 
-            foreach(var polygon in tilesToDownload)
+
+            foreach (var batch in allTiles.Chunkify(this.options.ParallellTasks))
             {
-                foreach (var batch in polygon.Value.Chunkify(this.options.ParallellTasks))
-                {
-                    SetTileGroup(polygon.Key, batch);
-                    await DownloadBatch(batch, progress, client);
-                }
+                await DownloadBatch(batch, progress, client);
             }
 
             int retryCount = 5;
             while(errorTiles.Count() > 0 && retryCount > 0)
             {
                 retryCount--;
-                await DownloadBatch(errorTiles.Select(x=>x.Value), progress, client);
+                await DownloadBatch(errorTiles, progress, client);
             }
             
 
             if (this.options.WriteReport)
             {
-                var report = $"<html><body><table><tr><td>Last run</td><td>{DateTime.Now}</td></tr><tr><td>Tiles downloaded</td><td>{progress.Report.Complete}</td></tr><tr><td>Downloaded to path</td><td>{this.options.Folder}</td></tr><tr><td>Time used</td><td>{progress.Elapsed}</td></tr></table></body></html>";
+                var report = $"<html><body><table><tr><td>Last run</td><td>{DateTime.Now}</td></tr><tr><td>Tiles downloaded</td><td>{progress.Report.Complete}</td></tr><tr><td>Downloaded to path</td><td>{this.options.Path}</td></tr><tr><td>Time used</td><td>{progress.Elapsed}</td></tr></table></body></html>";
                 File.WriteAllText("report.html", report);
-            }
-        }
-
-        private void SetTileGroup(string name, IEnumerable<Tile> batch)
-        {
-            foreach (var tile in batch)
-            {
-                tile.GroupName = name;
             }
         }
 
         private async Task DownloadBatch(IEnumerable<Tile> batch, DownloadTilesProgress progress, HttpClient httpClient)
         {
-            var tasks = batch.Select(x => x.Download(downloadFolder: this.options.Folder, imageFormat: this.options.ImageFormat, httpClient: httpClient, skipIfExist: this.options.SkipExisting));
+            var tasks = batch.Select(x => x.Download(downloadFolder: this.options.Path, imageFormat: this.options.ImageFormat, httpClient: httpClient, skipIfExist: this.options.SkipExisting));
             var result = await Task.WhenAll(tasks);
-            progress.SetTilesDownloaded(result.Where(x => x.Item2).Select(x => $"{x.Item1.GroupName}_{x.Item1.Url}").ToList());
+            progress.SetTilesDownloaded(result.Where(x => x.Item2).Select(x => x.Item1).ToList());
             foreach(var tileResult in result)
             {
-                var id = $"{tileResult.Item1.GroupName}_{tileResult.Item1.Url}";
                 if (tileResult.Item2)
                 {
-                    errorTiles.Remove(id);
+                    errorTiles.Remove(tileResult.Item1);
                 }
                 else
                 {
-                    errorTiles[id] = tileResult.Item1;
+                    errorTiles.Add(tileResult.Item1);
                 }
             }
-            if (this.options.ProgressReporter != null)
+            if (this.progressReporter != null)
             {
-                this.options.ProgressReporter.Report(progress.Report);
+                this.progressReporter.Report(progress.Report);
             }
         }
 
-        private Dictionary<string, List<Tile>> GetTilesToDownload()
+        public Dictionary<string, List<Point>> GetTilesToDownloadFromPolygon()
         {
-            if(!string.IsNullOrWhiteSpace(this.options.GeoJsonFilename))
+            var tilesToDownload = new Dictionary<string, List<Point>>();
+            var indexMapFile = Shapefile.OpenFile(this.options.ShapeFile);
+            indexMapFile.Reproject(ProjectionInfo.FromEpsgCode(4326));
+
+            // Get the map index from the Feature data
+            for (int i = 0; i < indexMapFile.DataTable.Rows.Count; i++)
             {
-                var area = GetFeaturesFromGeoJsonFile();
-                var tilesToDownload = new Dictionary<string, List<Tile>>();
-                foreach (var polygon in area.GetTilesForPolygonsInGeoJon(featureProperty: this.options.FeatureProperty, featurePropertyValue: this.options.FeaturePropertyValue, minZoom: this.options.MinZoom, maxZoom: this.options.MaxZoom, tilesUrlTemplate: this.tilesUrlTemplate))
+
+                // Get the feature
+                IFeature feature = indexMapFile.Features.ElementAt(i);
+
+                var polygon = feature.BasicGeometry as Polygon;
+                var name = (string)feature.DataRow[1];           
+
+                if(!string.IsNullOrWhiteSpace(this.options.FeaturePropertyValue))
                 {
-                    tilesToDownload[polygon.Item1] = polygon.Item2;
+                    if (this.options.FeaturePropertyValue != name)
+                    {
+                        continue;
+                    }
                 }
-                LogManager.GetCurrentClassLogger().Trace($"Polygons to download: {string.Join(", ", tilesToDownload.Select(x=>x.Key))}");
-
-
-                return tilesToDownload;
+                tilesToDownload[name] = polygon.GetTiles(name, this.options.MinZoom, this.options.MaxZoom);
+                // Now it's very quick to iterate through and work with the feature.
             }
-            else
-            {
-                var tiles = ExtensionMethods.GetTilesForWorld(this.options.MinZoom, this.options.MaxZoom, tilesUrlTemplate);
-                return new Dictionary<string, List<Tile>>() { { "World", tiles } };
-            }
-        }
-
-        private FeatureCollection GetFeaturesFromGeoJsonFile()
-        {
-            var geoJson = File.ReadAllText(this.options.GeoJsonFilename);
-            return new GeoJsonReader().Read<FeatureCollection>(geoJson);
+            return tilesToDownload;
         }
        
     }

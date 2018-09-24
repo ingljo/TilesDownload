@@ -7,8 +7,8 @@ namespace regObs.TilesDownload
     public class DownloadTilesProgress : Stopwatch
     {
 
-        private Dictionary<string, bool> _tilesDownloaded;
-        private List<string> _errorTiles;
+        private Dictionary<Tile, bool> _tilesDownloaded;
+        private List<Tile> _errorTiles;
 
         public bool HasError
         {
@@ -19,13 +19,13 @@ namespace regObs.TilesDownload
         }
 
 
-        public DownloadTilesProgress(List<string> tilesToDownload) : base()
+        public DownloadTilesProgress(List<Tile> tilesToDownload) : base()
         {
             _tilesDownloaded = tilesToDownload.ToDictionary(key => key, value => false);
-            _errorTiles = new List<string>();
+            _errorTiles = new List<Tile>();
         }
 
-        public void SetTilesDownloaded(List<string> tilesDownloaded)
+        public void SetTilesDownloaded(List<Tile> tilesDownloaded)
         {
             tilesDownloaded.ForEach(x => _tilesDownloaded[x] = true);
         }
@@ -43,7 +43,7 @@ namespace regObs.TilesDownload
             }
         }
 
-        internal void SetError(List<string> errorTiles)
+        internal void SetError(List<Tile> errorTiles)
         {
             _errorTiles.AddRange(errorTiles);
             _errorTiles = _errorTiles.Distinct().ToList();
