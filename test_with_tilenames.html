@@ -1,0 +1,73 @@
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.3.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.3.4/dist/leaflet.js"></script>
+    <script src="kommuner.js"></script>
+</head>
+
+<body>
+    <div id="map" style="width: 100%; height: 100%"></div>
+    <div id="map-control" style="position: absolute; right: 10px; top: 10px; width: 300px; padding: 10px; background-color: white; z-index: 9999">
+        <input type="checkbox" id="topo" onchange="changeTileLayer()" checked> Topokart
+        <br />
+        <input type="checkbox" id="steepness" onchange="changeTileLayer()"> Bratthetskart
+        <br />
+        <input type="checkbox" id="clayzones" onchange="changeTileLayer()"> Kvikkleire/Jordskred
+        <br />
+        <input type="checkbox" id="weakenedice" onchange="changeTileLayer()"> Svekket is
+        <br />
+        <input type="checkbox" id="floodzoones" onchange="changeTileLayer()"> Flomsoner
+        <br />
+        Zoom level: <span id="zoom">1</span>
+    </div>
+    <script>
+
+        L.GridLayer.GridDebug = L.GridLayer.extend({
+            createTile: function (coords) {
+                const tile = document.createElement('div');
+                tile.style.outline = '1px solid green';
+                tile.style.fontWeight = 'bold';
+                tile.style.fontSize = '14pt';
+                tile.innerHTML = `z:${coords.z} x: ${coords.x} y: ${coords.y}`;
+                return tile;
+            },
+        });
+
+        L.gridLayer.gridDebug = function (opts) {
+            return new L.GridLayer.GridDebug(opts);
+        };
+
+        const map = L.map('map', { center: [51.505, 10.00], zoom: 1 });
+        map.on('zoomend', function () {
+            document.getElementById("zoom").innerText = map.getZoom();
+        });
+
+        function changeTileLayer() {
+            map.eachLayer(function (layer) {
+                map.removeLayer(layer);
+            });
+
+            var checkboxes = document.getElementsByTagName("input");
+            for (var i = 0; i < checkboxes.length; i++) {
+                if (checkboxes[i].checked) {
+                    let folder = checkboxes[i].id;
+                    L.tileLayer(folder + '/{z}/tile_{x}_{y}.png').addTo(map);
+                }
+            }
+            var featureStyle = {
+                "color": "#ff7800",
+                "weight": 5,
+                "opacity": 0.2
+            };
+
+
+            L.geoJson(kommune).addTo(map);
+            map.addLayer(L.gridLayer.gridDebug());
+        }
+
+        changeTileLayer();
+    </script>
+</body>
+
+</html>

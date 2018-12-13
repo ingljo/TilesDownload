@@ -8,6 +8,8 @@ using NLog;
 using DotSpatial.Data;
 using DotSpatial.Projections;
 using DotSpatial.Topology;
+using NetTopologySuite.IO;
+using NetTopologySuite.Features;
 
 namespace regObs.TilesDownload
 {
@@ -123,6 +125,46 @@ namespace regObs.TilesDownload
 
         public Dictionary<string, List<Point>> GetTilesToDownloadFromPolygon()
         {
+            if(string.IsNullOrEmpty(this.options.ShapeFile))
+            {
+                return this.GetTilesForWorld();
+            }
+            else
+            {
+                if (this.options.ShapeFile.EndsWith("json"))
+                {
+                    return this.GetTilesFromGeojsonFile();
+                }
+                else
+                {
+                    return this.GetTilesFromShapeFile();
+                }
+            }
+            
+        }
+
+        private Dictionary<string, List<Point>> GetTilesForWorld()
+        {
+            var tilesToDownload = new List<Point>();
+            for(var z = this.options.MinZoom; z <= this.options.MaxZoom; z++)
+            {
+                var maxTile = (2 ^ z);
+                for (var x=0; x < maxTile; x++)
+                {
+                    for(var y=0; y < maxTile; y++)
+                    {
+                        tilesToDownload.Add(new Point(x, y, z));
+                    }
+                }
+            }
+            return new Dictionary<string, List<Point>>()
+            {
+                { "World", tilesToDownload }
+            };
+        }
+
+        private Dictionary<string, List<Point>>  GetTilesFromShapeFile()
+        {
             var tilesToDownload = new Dictionary<string, List<Point>>();
             var indexMapFile = Shapefile.OpenFile(this.options.ShapeFile);
             indexMapFile.Reproject(ProjectionInfo.FromEpsgCode(4326));
@@ -132,12 +174,12 @@ namespace regObs.TilesDownload
             {
 
                 // Get the feature
-                IFeature feature = indexMapFile.Features.ElementAt(i);
+                DotSpatial.Data.IFeature feature = indexMapFile.Features.ElementAt(i);
 
                 var polygon = feature.BasicGeometry as Polygon;
-                var name = (string)feature.DataRow[1];           
+                var name = (string)feature.DataRow[1];
 
-                if(!string.IsNullOrWhiteSpace(this.options.FeaturePropertyValue))
+                if (!string.IsNullOrWhiteSpace(this.options.FeaturePropertyValue))
                 {
                     if (this.options.FeaturePropertyValue != name)
                     {
@@ -149,7 +191,35 @@ namespace regObs.TilesDownload
             }
             return tilesToDownload;
         }
-       
+
+        private Dictionary<string, List<Point>> GetTilesFromGeojsonFile()
+        {
+            var tilesToDownload = new Dictionary<string, List<Point>>();
+            var featureCollection = GetFeaturesFromGeoJsonFile();
+            // var name = "norway";
+            foreach (var feature in featureCollection.Features)
+            {
+                var name = feature.Attributes[this.options.FeaturePropertyName].ToString();
+                if (!string.IsNullOrWhiteSpace(this.options.FeaturePropertyValue))
+                {
+                    if (this.options.FeaturePropertyValue != name)
+                    {
+                        continue;
+                    }
+                }
+                var polygon = new Polygon(feature.Geometry.Coordinates.Select((coordinate) => new Coordinate(coordinate.X, coordinate.Y)).ToArray());
+                tilesToDownload[name] = polygon.GetTiles(name, this.options.MinZoom, this.options.MaxZoom);
+            }
+            return tilesToDownload;
+        }
+
+        private FeatureCollection GetFeaturesFromGeoJsonFile()
+        {
+            var geoJson = File.ReadAllText(this.options.ShapeFile);
+            return new GeoJsonReader().Read<FeatureCollection>(geoJson);
+        }
+
+
     }
 
 }
