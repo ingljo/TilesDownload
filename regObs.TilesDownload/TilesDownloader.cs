@@ -53,7 +53,7 @@ namespace regObs.TilesDownload
 
             if (this.options.WriteMetadata)
             {
-                var folders = tilesToDownload.GroupBy(x => new { x.TileName, x.GroupName }).Select((g) => new { key = $"{g.Key.GroupName}//{g.Key.TileName}", metadata = Newtonsoft.Json.JsonConvert.SerializeObject(g.Select(t => $"{t.TileName}/{t.Z}/tile_{t.X}_{t.Y}")) });
+                var folders = tilesToDownload.GroupBy(x => x.GroupName).Select((g) => new { key = g.Key, metadata = Newtonsoft.Json.JsonConvert.SerializeObject(g.Select(t => $"{t.TileName}/{t.Z}/tile_{t.X}_{t.Y}")) });
                 foreach (var folder in folders)
                 {
                     var path = this.options.Path + "//" + folder.key +"//" +"tiles.json";
